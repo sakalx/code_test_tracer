@@ -6,6 +6,7 @@ function init() {
     usersId: ['1', '2'],
     users: {},
     selectedAlbums: [],
+    loading: false,
   };
 
   API.getUsers(state.usersId)
@@ -24,17 +25,42 @@ function init() {
       });
     })
     .then(() => {
+      console.log(state);
       // renderListOfAlbums()
       // bindEventsToAlbums()
+
+      renderTableAlbums(state.users)
     });
+
+
 }
 
 
-/*// DOM
-const DOM = {
-  firstTable: $('main:nth-child(1)'),
-  secondTable: $('main:nth-child(2)'),
-};*/
+function renderTableAlbums(users) {
+
+  const templateTableAlbums = user => `
+    <div class='table'>
+        <div class='table__row table__header'>
+            <div class='table__cell table__cell--short'>id</div>
+            <div class='table__cell'>title</div>
+        </div>
+        
+        ${user.albums.map(({id, title}) => `
+          <div class='table__row' draggable='true'>
+              <div class='table__cell table__cell--short'>${id}</div>
+              <div class='table__cell table__cell'>${title}</div>
+          </div>
+        `).join('')}
+        
+    </div>
+    `;
+
+  const listOfTable = Object.values(users).map(templateTableAlbums).join('');
+
+  $('main').append(listOfTable);
+}
+
+
 const DOM = (() => {
 
 })();
@@ -42,29 +68,35 @@ const DOM = (() => {
 
 const API = (() => {
   const baseURL = 'https://jsonplaceholder.typicode.com';
+  let currentLoading = false;
 
   const handleError = jqXHR => {
     console.error(`status code: ${jqXHR.status}`);
     console.log(`error message: ${jqXHR.responseText}`)
   };
 
-  const ajax = ({url, endPoint = ''}) => id => {
+  const showLoader = (loading = true) => {
+    if (currentLoading !== loading) {
+      currentLoading = loading;
+      console.log('toggle spinner');
+    }
+  };
+
+  const getData = ({url, endPoint = ''}) => id => {
     const api = `${url}/${id}/${endPoint}`;
-    // In the meantime when we wait for data we can show a spinner, if it needed :
-    // showLoader();
+    showLoader();
 
     return $.getJSON(api)
       .fail(jqXHR => handleError(jqXHR))
-    // Hide spinner :
-    // .always(() => showLoader(false));
+      .always(() => showLoader(false));
   };
 
   const getAllData = request => list => Promise.all(list.map(id => request(id)));
 
-  const fetchUser = ajax({
+  const fetchUser = getData({
     url: `${baseURL}/users`,
   });
-  const fetchAlbumsByUser = ajax({
+  const fetchAlbumsByUser = getData({
     url: `${baseURL}/users`,
     endPoint: 'albums',
   });
@@ -78,10 +110,6 @@ const API = (() => {
 
 function updateAlbumsOfUser(userId, albumId) {
   console.log('updateUserAlbum');
-}
-
-function showLoader(loading = true) {
-  console.log(loading);
 }
 
 
