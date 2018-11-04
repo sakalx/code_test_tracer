@@ -6,7 +6,6 @@ function init() {
     usersId: ['1', '2'],
     users: {},
     selectedAlbums: [],
-    loading: false,
   };
 
   API.getUsers(state.usersId)
@@ -25,18 +24,22 @@ function init() {
       });
     })
     .then(() => {
-      console.log(state);
-      // renderListOfAlbums()
-      // bindEventsToAlbums()
-
-      renderTableAlbums(state.users)
+      renderTables(state.users);
+      bindEventsForTable()
     });
 
 
+  API.updateUser({id:1, data:   {
+      "userId": 1,
+      "id": 3,
+      "title": "omnis laborum odio"
+    },}).then(res => {
+    console.log(res);
+  })
 }
 
 
-function renderTableAlbums(users) {
+function renderTables(users) {
 
   const templateTableAlbums = user => `
     <div class='table'>
@@ -48,7 +51,7 @@ function renderTableAlbums(users) {
         ${user.albums.map(({id, title}) => `
           <div class='table__row' draggable='true'>
               <div class='table__cell table__cell--short'>${id}</div>
-              <div class='table__cell table__cell'>${title}</div>
+              <div class='table__cell'>${title}</div>
           </div>
         `).join('')}
         
@@ -56,18 +59,77 @@ function renderTableAlbums(users) {
     `;
 
   const listOfTable = Object.values(users).map(templateTableAlbums).join('');
-
   $('main').append(listOfTable);
 }
 
 
-const DOM = (() => {
+function handleAddDragEvents(e) {
+  const currentElement = e.target.closest('.table__row');
+  currentElement.addEventListener('dragstart', dragStart);
+  currentElement.addEventListener('dragend', dragEnd);
+}
 
-})();
+function handleRemoveDragEvents(e) {
+  const currentElement = e.target.closest('.table__row');
+  currentElement.removeEventListener('dragstart', dragStart);
+  currentElement.removeEventListener('dragend', dragEnd);
+}
+
+
+function bindEventsForTable() {
+  const tables = $('.table');
+
+  for (const table of tables) {
+    table.addEventListener('dragover', dragOver);
+    table.addEventListener('dragenter', dragEnter);
+    table.addEventListener('drop', dragDrop);
+    table.addEventListener('mousedown', handleAddDragEvents);
+    table.addEventListener('mouseup', handleRemoveDragEvents);
+  }
+}
+
+let draggableElement = null;
+
+function dragOver(e) {
+  e.preventDefault();
+  console.log('dragOver');
+}
+
+function dragEnter(e) {
+  e.preventDefault();
+  console.log('dragEnter');
+}
+
+function dragDrop(e) {
+
+  this.append(draggableElement);
+}
+
+
+function dragStart(e) {
+  console.log('dragStart');
+  draggableElement = e.target.closest('.table__row');
+  setTimeout(() => $(this).toggleClass('invisible'), 0);
+}
+
+function dragEnd(e) {
+  console.log('dragEnd');
+  $(this).toggleClass('invisible');
+}
+
+
+function dragLeave(e) {
+  console.log('dragLeave', e);
+}
+
+
+function hintDropSection(el) {
+  console.log('dropToArea');
+}
 
 
 const API = (() => {
-  const baseURL = 'https://jsonplaceholder.typicode.com';
+  const url = 'https://jsonplaceholder.typicode.com/users';
   let currentLoading = false;
 
   const handleError = jqXHR => {
@@ -91,19 +153,32 @@ const API = (() => {
       .always(() => showLoader(false));
   };
 
-  const getAllData = request => list => Promise.all(list.map(id => request(id)));
+  const putData = url => ({id, data}) => {
+    const api = `${url}/${id}`;
+    showLoader();
 
-  const fetchUser = getData({
-    url: `${baseURL}/users`,
-  });
-  const fetchAlbumsByUser = getData({
-    url: `${baseURL}/users`,
-    endPoint: 'albums',
-  });
+    return $.ajax({
+      url: api,
+      type: 'put',
+      headers: {
+        'Content-type': 'application/json; charset=UTF-8',
+      },
+      data: JSON.stringify(data),
+    })
+      .fail(jqXHR => handleError(jqXHR))
+      .always(() => showLoader(false));
+  };
+
+  const getAll = request => list => Promise.all(list.map(id => request(id)));
+
+  const fetchUser = getData({url});
+  const fetchAlbumsByUser = getData({url, endPoint: 'albums'});
+  const updateUser = putData(url);
 
   return {
-    getUsers: getAllData(fetchUser),
-    getAlbumsByUser: getAllData(fetchAlbumsByUser),
+    getUsers: getAll(fetchUser),
+    getAlbumsByUser: getAll(fetchAlbumsByUser),
+    updateUser,
   }
 })();
 
@@ -112,32 +187,6 @@ function updateAlbumsOfUser(userId, albumId) {
   console.log('updateUserAlbum');
 }
 
-
-// DOM handlers
-function createElement(id, title) {
-  console.log('createItem');
-}
-
-function appendElement(el) {
-  console.log('appendElement');
-}
-
-// Drag&Drop handlers
-function dragElement(el) {
-  console.log('dragElement');
-}
-
-function multipleDrags(elements) {
-  console.log('dropToArea');
-}
-
-function dropToSection(el) {
-  console.log('dropToArea');
-}
-
-function hintDropSection(el) {
-  console.log('dropToArea');
-}
 
 // Utils
 function filterArrayByText(array, text) {
