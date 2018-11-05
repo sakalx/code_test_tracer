@@ -5,6 +5,7 @@ body {
 }
 
 main {
+    position: relative;
     display: flex;
     justify-content: space-between;
 }
@@ -73,10 +74,6 @@ main {
     margin-right: 0;
 }
 
-.invisible {
-    visibility: hidden;
-}
-
 .spinner {
     display: flex;
     justify-content: center;
@@ -86,16 +83,16 @@ main {
     height: 100%;
     top: 0;
     left: 0;
-    background: rgba(0,0,0, .3);
+    background: rgba(0,0,0, .1);
 }
 
 .spinner__icon {
     display: inline-block;
     width: 50px;
     height: 50px;
-    border: 3px solid rgba(255,255,255,.3);
+    border: 3px solid #fff;
     border-radius: 50%;
-    border-top-color: #fff;
+    border-top-color: #333;
     animation: spin 1s ease-in-out infinite;
     -webkit-animation: spin 1s ease-in-out infinite;
 }
@@ -110,3 +107,22 @@ main {
         -webkit-transform: rotate(360deg);
     }
 }
+
+.invisible {
+    visibility: hidden;
+}
+
+.hold {
+    color: #2196f3 ;
+    border: 2px solid #2196f3;
+}
+
+.drop-hint {
+    border: 1px solid #2196f3;
+    box-shadow: 5px 5px 20px #2196f3;
+}
+/*.drop-hint:before {*/
+    /*content: 'Drop Here!';*/
+    /*color: #2196f3;*/
+    /*font-weight: bold;*/
+/*}*/

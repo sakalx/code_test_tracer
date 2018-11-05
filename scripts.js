@@ -164,31 +164,40 @@ const DOM = (() => {
 const DD = (() => {
   let draggableElement = null;
 
+  const transferFromUser = () => draggableElement.parentElement.dataset.user;
+
+  const handleDropHint = () => {
+    $('.table').each(function()  {
+     $(this).data('user') !== +transferFromUser() && $(this).toggleClass('drop-hint');
+    });
+  };
+
   const handleDragOver = e => e.preventDefault();
 
   const handleDragStart = e => {
-    const albumNode = DOM.node.getAlbumNode(e);
+    draggableElement = DOM.node.getAlbumNode(e);
 
-    draggableElement = albumNode;
-    setTimeout(() => $(albumNode).toggleClass('invisible'), 0);
+    $(draggableElement).toggleClass('hold');
+    setTimeout(() => $(draggableElement).toggleClass('invisible'), 0);
+    handleDropHint();
   };
 
   const handleDragEnd = e => {
-    const albumNode = DOM.node.getAlbumNode(e);
-    $(albumNode).toggleClass('invisible');
+    $(draggableElement).toggleClass('hold');
+    $(draggableElement).toggleClass('invisible');
+    handleDropHint();
   };
 
   function handleDrop(e) {
     const albumNode = DOM.node.getAlbumNode(e);
     const albumId = +draggableElement.dataset.album;
 
-    const transferFromUser = draggableElement.parentElement.dataset.user;
     const transferToUser = albumNode ? albumNode.parentElement.dataset.user : e.target.dataset.user;
 
-    if (transferFromUser !== transferToUser) {
+    if (transferFromUser() !== transferToUser) {
       Promise.all([
-        utilsDrop.handleFromUserRequest(transferFromUser, albumId),
-        utilsDrop.handleToUserRequest(transferFromUser, transferToUser, albumId),
+        utilsDrop.handleFromUserRequest(transferFromUser(), albumId),
+        utilsDrop.handleToUserRequest(transferFromUser(), transferToUser, albumId),
       ])
         .then(users => {
           state.users = {...state.users, ...utilsDrop.getUpdatedUsers(users)};
@@ -302,7 +311,6 @@ const API = (() => {
 // ================================================================
 // UTILS handler
 const UTILS = (() => {
-
   const testValue = (value, text) => {
     const regex = new RegExp(value, 'gi');
     return regex.test(text);
