@@ -1,14 +1,14 @@
 $(init);
 
+const state = {
+  usersId: ['1', '2'],
+  users: {},
+  selectedAlbums: [],
+};
+
 function init() {
 
-  const state = {
-    usersId: ['1', '2'],
-    users: {},
-    selectedAlbums: [],
-  };
-
-  API.getUsers(state.usersId)
+  const getUsers = API.getUsers(state.usersId)
     .then(users => {
       users.forEach(user => {
         const userId = String(user.id);
@@ -16,118 +16,153 @@ function init() {
       });
     });
 
-  API.getAlbumsByUser(state.usersId)
+  const getAlbums = API.getAlbumsByUser(state.usersId)
     .then(res => {
       res.forEach(albums => {
         const userId = String(albums[0].userId);
         state.users[userId] = {...state.users[userId], albums};
       });
-    })
-    .then(() => {
-      renderTables(state.users);
-      bindEventsForTable()
     });
 
-
-  API.updateUser({id:1, data:   {
-      "userId": 1,
-      "id": 3,
-      "title": "omnis laborum odio"
-    },}).then(res => {
-    console.log(res);
-  })
+  Promise.all([getUsers, getAlbums])
+    .then(() => {
+      DOM.render.tables(state.users);
+      DOM.listener.bindEventsForTable();
+    });
 }
 
 
-function renderTables(users) {
+// ================================================================
+// DOM handler
+const DOM = (() => {
+  const node = {
+    getAlbumNode({target}) {
+      return target.closest('.table__row');
+    },
+  };
 
-  const templateTableAlbums = user => `
-    <div class='table'>
-        <div class='table__row table__header'>
-            <div class='table__cell table__cell--short'>id</div>
-            <div class='table__cell'>title</div>
+  const listener = {
+    handleAddDragEvents(e) {
+      const selectedAlbum = DOM.node.getAlbumNode(e);
+      selectedAlbum.addEventListener('dragstart', DD.handleDragStart);
+      selectedAlbum.addEventListener('dragend', DD.handleDragEnd);
+    },
+    handleRemoveDragEvents(e) {
+      const selectedAlbum = DOM.node.getAlbumNode(e);
+      selectedAlbum.removeEventListener('dragstart', DD.handleDragStart);
+      selectedAlbum.removeEventListener('dragend', DD.handleDragEnd);
+    },
+    bindEventsForTable() {
+      const tables = $('.table');
+      for (const table of tables) {
+        table.addEventListener('dragover', DD.handleDragOver);
+        table.addEventListener('drop', DD.handleDrop);
+        table.addEventListener('mousedown', this.handleAddDragEvents);
+        table.addEventListener('mouseup', this.handleRemoveDragEvents);
+      }
+    },
+  };
+
+  const render = {
+    tables(users) {
+      const templateTableAlbums = user => `
+        <div class='table' data-user=${user.id}>
+            <div class='table__row table__header'>
+                <div class='table__cell table__cell--short'>id</div>
+                <div class='table__cell'>title</div>
+            </div>
+            
+            ${user.albums.map(({id, title}) => `
+              <div class='table__row table__row--hover' data-album=${id} draggable='true'>
+                  <div class='table__cell table__cell--short'>${id}</div>
+                  <div class='table__cell'>${title}</div>
+              </div>
+            `).join('')}
+            
         </div>
-        
-        ${user.albums.map(({id, title}) => `
-          <div class='table__row' draggable='true'>
-              <div class='table__cell table__cell--short'>${id}</div>
-              <div class='table__cell'>${title}</div>
-          </div>
-        `).join('')}
-        
-    </div>
-    `;
+        `;
 
-  const listOfTable = Object.values(users).map(templateTableAlbums).join('');
-  $('main').append(listOfTable);
-}
+      const listOfTable = Object.values(users).map(templateTableAlbums).join('');
+      $('main').append(listOfTable);
+    }
+  };
 
 
-function handleAddDragEvents(e) {
-  const currentElement = e.target.closest('.table__row');
-  currentElement.addEventListener('dragstart', dragStart);
-  currentElement.addEventListener('dragend', dragEnd);
-}
-
-function handleRemoveDragEvents(e) {
-  const currentElement = e.target.closest('.table__row');
-  currentElement.removeEventListener('dragstart', dragStart);
-  currentElement.removeEventListener('dragend', dragEnd);
-}
-
-
-function bindEventsForTable() {
-  const tables = $('.table');
-
-  for (const table of tables) {
-    table.addEventListener('dragover', dragOver);
-    table.addEventListener('dragenter', dragEnter);
-    table.addEventListener('drop', dragDrop);
-    table.addEventListener('mousedown', handleAddDragEvents);
-    table.addEventListener('mouseup', handleRemoveDragEvents);
+  return {
+    node,
+    listener,
+    render,
   }
-}
-
-let draggableElement = null;
-
-function dragOver(e) {
-  e.preventDefault();
-  console.log('dragOver');
-}
-
-function dragEnter(e) {
-  e.preventDefault();
-  console.log('dragEnter');
-}
-
-function dragDrop(e) {
-
-  this.append(draggableElement);
-}
+})();
+// DOM handler END
+// ================================================================
 
 
-function dragStart(e) {
-  console.log('dragStart');
-  draggableElement = e.target.closest('.table__row');
-  setTimeout(() => $(this).toggleClass('invisible'), 0);
-}
+// ================================================================
+// Drag & Drop handler
+const DD = (() => {
+  let draggableElement = null;
 
-function dragEnd(e) {
-  console.log('dragEnd');
-  $(this).toggleClass('invisible');
-}
+  const handleDragOver = e => e.preventDefault();
+
+  const handleDragStart = e => {
+    const albumNode = DOM.node.getAlbumNode(e);
+
+    draggableElement = albumNode;
+    setTimeout(() => $(albumNode).toggleClass('invisible'), 0);
+  };
+
+  const handleDragEnd = e => {
+    const albumNode = DOM.node.getAlbumNode(e);
+    $(albumNode).toggleClass('invisible');
+  };
+
+  function handleDrop(e) {
+    const albumNode = DOM.node.getAlbumNode(e);
+    const transferFromUser = draggableElement.parentElement.dataset.user;
+    const transferToUser = albumNode ? albumNode.parentElement.dataset.user : e.target.dataset.user;
+
+    if (transferFromUser === transferToUser) return;
+
+    const albumId = +draggableElement.dataset.album;
+    const fromAlbum = state.users[transferFromUser].albums;
+
+    const fromUserNewData = {
+      ...state.users[transferFromUser],
+      albums: state.users[transferFromUser].albums.filter(({id}) => id !== albumId),
+    };
+    const toUserNewData = {
+      ...state.users[transferToUser],
+      albums: [...state.users[transferToUser].albums, fromAlbum.find(({id}) => id === albumId)],
+    };
+
+    const fromUserRequest = API.updateUser({id: transferFromUser, data: fromUserNewData});
+    const toUserRequest = API.updateUser({id: transferToUser, data: toUserNewData});
+
+    Promise.all([fromUserRequest, toUserRequest]).then(res => {
+      const updatedUsers = res.reduce((acc, next) => {
+        acc[next.id] = {...next};
+        return acc
+      }, {});
+
+      state.users = {...state.users, ...updatedUsers};
+      this.append(draggableElement);
+    });
+  }
+
+  return {
+    handleDragOver,
+    handleDragStart,
+    handleDragEnd,
+    handleDrop,
+  }
+})();
+// Drag & Drop handler END
+// ================================================================
 
 
-function dragLeave(e) {
-  console.log('dragLeave', e);
-}
-
-
-function hintDropSection(el) {
-  console.log('dropToArea');
-}
-
-
+// ================================================================
+// API handler
 const API = (() => {
   const url = 'https://jsonplaceholder.typicode.com/users';
   let currentLoading = false;
@@ -181,30 +216,5 @@ const API = (() => {
     updateUser,
   }
 })();
-
-
-function updateAlbumsOfUser(userId, albumId) {
-  console.log('updateUserAlbum');
-}
-
-
-// Utils
-function filterArrayByText(array, text) {
-  console.log('filterArrayByText');
-}
-
-
-const BindEvents = newItem => {
-  const checkbox = newItem.querySelector('.checkbox'),
-    editButton = newItem.querySelector('button.edit'),
-    delButton = newItem.querySelector('button.delete');
-
-  checkbox.addEventListener('change', Checkbox);
-  //editButton.addEventListener('click', EditItem);
-  //delButton.addEventListener('click', DelButton);
-};
-
-const Checkbox = ({target}) => {
-  const item = target.parentNode;
-  item.classList.toggle('completed');
-};
+// API handler END
+// ================================================================

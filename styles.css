@@ -51,8 +51,12 @@ main {
 .table__row:last-child {
     border-bottom: 0
 }
-.table__row:nth-child(even) {
+.table__row--hover:nth-child(even) {
     background: rgba(0, 0, 0, .05);
+}
+.table__row--hover:hover {
+    background: rgba(0, 0, 0, .2);
+    cursor: pointer;
 }
 
 .table__cell {
@@ -65,7 +69,6 @@ main {
 .table__cell:last-child {
     margin-right: 0;
 }
-
 
 .invisible {
     visibility: hidden;
