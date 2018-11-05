@@ -7,6 +7,7 @@ const state = {
 };
 
 function init() {
+  DOM.render.allSearchForm(state.usersId);
 
   const getUsers = API.getUsers(state.usersId)
     .then(users => {
@@ -26,8 +27,9 @@ function init() {
 
   Promise.all([getUsers, getAlbums])
     .then(() => {
-      DOM.render.tables(state.users);
-      DOM.listener.bindEventsForTable();
+      DOM.render.allTables(state.users);
+      DOM.listener.bindEventsForTables();
+      DOM.listener.bindEventsForSearchForms();
     });
 }
 
@@ -39,52 +41,111 @@ const DOM = (() => {
     getAlbumNode({target}) {
       return target.closest('.table__row');
     },
+    getSearchField({target}) {
+      return target.previousElementSibling;
+    },
   };
 
   const listener = {
-    handleAddDragEvents(e) {
-      const selectedAlbum = DOM.node.getAlbumNode(e);
-      selectedAlbum.addEventListener('dragstart', DD.handleDragStart);
-      selectedAlbum.addEventListener('dragend', DD.handleDragEnd);
+    _handleSearch(e) {
+      const isReset = e.target.innerHTML === 'Reset';
+      const userId = e.target.dataset.user;
+      const albums = state.users[userId].albums;
+      const searchField = DOM.node.getSearchField(e);
+
+      const updateTable = user => {
+        DOM.render.tableByUser(user);
+        DOM.listener.bindEventsForTables();
+        e.target.innerHTML = isReset ? 'Submit' : 'Reset';
+        isReset && (searchField.value = '');
+      };
+
+      if (searchField.value.length > 2) {
+        const filteredAlbums = albums.filter(({title}) => UTILS.testValue(searchField.value, title));
+        const user = {
+          ...state.users[userId],
+          albums: filteredAlbums,
+        };
+        filteredAlbums.length && updateTable(user);
+      }
+
+      isReset && updateTable(state.users[userId]);
     },
-    handleRemoveDragEvents(e) {
+    _handleAddDragEvents(e) {
       const selectedAlbum = DOM.node.getAlbumNode(e);
-      selectedAlbum.removeEventListener('dragstart', DD.handleDragStart);
-      selectedAlbum.removeEventListener('dragend', DD.handleDragEnd);
+      if (selectedAlbum) {
+        selectedAlbum.addEventListener('dragstart', DD.handleDragStart);
+        selectedAlbum.addEventListener('dragend', DD.handleDragEnd);
+      }
     },
-    bindEventsForTable() {
+    _handleRemoveDragEvents(e) {
+      const selectedAlbum = DOM.node.getAlbumNode(e);
+      if (selectedAlbum) {
+        selectedAlbum.removeEventListener('dragstart', DD.handleDragStart);
+        selectedAlbum.removeEventListener('dragend', DD.handleDragEnd);
+      }
+    },
+    bindEventsForTables() {
       const tables = $('.table');
       for (const table of tables) {
         table.addEventListener('dragover', DD.handleDragOver);
         table.addEventListener('drop', DD.handleDrop);
-        table.addEventListener('mousedown', this.handleAddDragEvents);
-        table.addEventListener('mouseup', this.handleRemoveDragEvents);
+        table.addEventListener('mousedown', this._handleAddDragEvents);
+        table.addEventListener('mouseup', this._handleRemoveDragEvents);
+      }
+    },
+    bindEventsForSearchForms() {
+      const searchButtons = $('.search__button');
+      for (const searchBtn of searchButtons) {
+        searchBtn.addEventListener('click', this._handleSearch);
       }
     },
   };
 
   const render = {
-    tables(users) {
-      const templateTableAlbums = user => `
-        <div class='table' data-user=${user.id}>
-            <div class='table__row table__header'>
-                <div class='table__cell table__cell--short'>id</div>
-                <div class='table__cell'>title</div>
-            </div>
-            
-            ${user.albums.map(({id, title}) => `
-              <div class='table__row table__row--hover' data-album=${id} draggable='true'>
-                  <div class='table__cell table__cell--short'>${id}</div>
-                  <div class='table__cell'>${title}</div>
+    template: {
+      tableAlbums(user) {
+        return `
+          <div class='table' data-user=${user.id}>
+              <div class='table__row table__header'>
+                  <div class='table__cell table__cell--short'>id</div>
+                  <div class='table__cell'>title</div>
               </div>
-            `).join('')}
-            
-        </div>
-        `;
+              
+              ${user.albums.map(({id, title}) => `
+                <div class='table__row table__row--hover' data-album=${id} draggable='true'>
+                    <div class='table__cell table__cell--short'>${id}</div>
+                    <div class='table__cell'>${title}</div>
+                </div>
+              `).join('')}
+              
+          </div>
+       `;
+      },
+      searchForm(userId) {
+        return `
+          <div class='search'>
+            <label class='search__label'>Search</label>
+            <input class='search__input' type='text'/>
+            <button class='search__button' type='submit' data-user=${userId}>Submit</button>
+          </div>
+      `;
+      },
+    },
 
-      const listOfTable = Object.values(users).map(templateTableAlbums).join('');
+    allTables(users) {
+      const listOfTable = Object.values(users).map(this.template.tableAlbums).join('');
       $('main').append(listOfTable);
-    }
+    },
+
+    tableByUser(user) {
+      $(`main [data-user='${user.id}']`).replaceWith(this.template.tableAlbums(user));
+    },
+
+    allSearchForm(usersId) {
+      const searchForms = usersId.map(this.template.searchForm).join('');
+      $('.search-wrap').append(searchForms);
+    },
   };
 
 
@@ -119,36 +180,54 @@ const DD = (() => {
 
   function handleDrop(e) {
     const albumNode = DOM.node.getAlbumNode(e);
+    const albumId = +draggableElement.dataset.album;
+
     const transferFromUser = draggableElement.parentElement.dataset.user;
     const transferToUser = albumNode ? albumNode.parentElement.dataset.user : e.target.dataset.user;
 
-    if (transferFromUser === transferToUser) return;
+    if (transferFromUser !== transferToUser) {
+      Promise.all([
+        utilsDrop.handleFromUserRequest(transferFromUser, albumId),
+        utilsDrop.handleToUserRequest(transferFromUser, transferToUser, albumId),
+      ])
+        .then(users => {
+          state.users = {...state.users, ...utilsDrop.getUpdatedUsers(users)};
+          this.append(draggableElement);
+        });
+    }
+  }
 
-    const albumId = +draggableElement.dataset.album;
-    const fromAlbum = state.users[transferFromUser].albums;
-
-    const fromUserNewData = {
-      ...state.users[transferFromUser],
-      albums: state.users[transferFromUser].albums.filter(({id}) => id !== albumId),
-    };
-    const toUserNewData = {
-      ...state.users[transferToUser],
-      albums: [...state.users[transferToUser].albums, fromAlbum.find(({id}) => id === albumId)],
-    };
-
-    const fromUserRequest = API.updateUser({id: transferFromUser, data: fromUserNewData});
-    const toUserRequest = API.updateUser({id: transferToUser, data: toUserNewData});
-
-    Promise.all([fromUserRequest, toUserRequest]).then(res => {
-      const updatedUsers = res.reduce((acc, next) => {
+  const utilsDrop = {
+    getUpdatedUsers(users) {
+      return users.reduce((acc, next) => {
         acc[next.id] = {...next};
         return acc
       }, {});
+    },
 
-      state.users = {...state.users, ...updatedUsers};
-      this.append(draggableElement);
-    });
-  }
+    handleToUserRequest(userFromId, userToId, albumId) {
+      const fromAlbums = state.users[userFromId].albums;
+      const transferredAlbum = fromAlbums.find(({id}) => id === albumId);
+
+      transferredAlbum.userId = +userToId;
+
+      const toUserNewData = {
+        ...state.users[userToId],
+        albums: [...state.users[userToId].albums, transferredAlbum],
+      };
+
+      return API.updateUser({id: userToId, data: toUserNewData});
+    },
+
+    handleFromUserRequest(userFromId, albumId) {
+      const fromUserNewData = {
+        ...state.users[userFromId],
+        albums: state.users[userFromId].albums.filter(({id}) => id !== albumId),
+      };
+
+      return API.updateUser({id: userFromId, data: fromUserNewData});
+    }
+  };
 
   return {
     handleDragOver,
@@ -214,6 +293,23 @@ const API = (() => {
     getUsers: getAll(fetchUser),
     getAlbumsByUser: getAll(fetchAlbumsByUser),
     updateUser,
+  }
+})();
+// API handler END
+// ================================================================
+
+
+// ================================================================
+// UTILS handler
+const UTILS = (() => {
+
+  const testValue = (value, text) => {
+    const regex = new RegExp(value, 'gi');
+    return regex.test(text);
+  };
+
+  return {
+    testValue,
   }
 })();
 // API handler END
