@@ -254,7 +254,7 @@ const API = (() => {
   const showLoader = (loading = true) => {
     if (currentLoading !== loading) {
       currentLoading = loading;
-      console.log('toggle spinner');
+      $('.spinner').toggleClass('invisible');
     }
   };
 
