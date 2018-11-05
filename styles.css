@@ -51,6 +51,9 @@ main {
 .table__row:last-child {
     border-bottom: 0
 }
+.table__row:nth-child(even) {
+    background: rgba(0, 0, 0, .05);
+}
 
 .table__cell {
     margin-right: 10px;
@@ -60,5 +63,10 @@ main {
     width: 50px;
 }
 .table__cell:last-child {
-    margin-right: 0px;
+    margin-right: 0;
+}
+
+
+.invisible {
+    visibility: hidden;
 }
