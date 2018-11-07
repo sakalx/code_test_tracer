@@ -49,16 +49,18 @@ main {
 
 .table__row {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 5px;
     border-bottom: 1px solid #333;
 }
 .table__row:last-child {
     border-bottom: 0
 }
-.table__row--hover:nth-child(even) {
+.table__row--items:nth-child(even) {
     background: rgba(0, 0, 0, .05);
 }
-.table__row--hover:hover {
+.table__row--items:hover {
     background: rgba(0, 0, 0, .2);
     cursor: pointer;
 }
@@ -70,9 +72,13 @@ main {
     flex-shrink: 0;
     width: 50px;
 }
+.table__cell--large {
+    flex: 1;
+}
 .table__cell:last-child {
     margin-right: 0;
 }
+
 
 .spinner {
     display: flex;
@@ -117,12 +123,17 @@ main {
     border: 2px solid #2196f3;
 }
 
+.selected {
+    background: rgba(0, 0, 0, .3) !important;
+    color: #fff;
+}
+
 .drop-hint {
     border: 1px solid #2196f3;
     box-shadow: 5px 5px 20px #2196f3;
 }
-/*.drop-hint:before {*/
-    /*content: 'Drop Here!';*/
-    /*color: #2196f3;*/
-    /*font-weight: bold;*/
-/*}*/
+.drop-hint:before {
+    content: 'DROP IN TABLE!';
+    color: #2196f3;
+    font-weight: bold;
+}
